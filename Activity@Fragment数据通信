@@ -183,5 +183,6 @@
             getTargetFragment().onActivityResult(FirstFragment.REQUEST_CODE,resultOk,intent);  
         }  
    }
-
+3、android中Fragment && Fragment activity && Fragment 数据交互
+  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++（sp|网络|sql|存储（缓存、内存））文件！！！++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   
