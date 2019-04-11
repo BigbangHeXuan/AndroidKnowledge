@@ -1,0 +1,110 @@
+内存泄漏原因：
+  
+  1、资源对象没关闭造成的内存泄漏（如： Cursor、File等）
+  2、ListView 的 Adapter 中没有使用缓存的 ConvertView（ConvertView其实是滑出屏幕的View的缓存，不使用ConvertView会频繁创建新的View对象，
+      只会造成内存溢出，而不是内存泄漏。这个问题我们首先要明白内存泄漏的真正原因：A对象引用B对象，但是A对象的生命周期比B对象的生命周期长的多，
+      B生命周期到了还在被A引用，导致B对象不能回收，从而引起内存泄漏）
+  3、Bitmap 对象不在使用时调用recycle()释放内存
+  4、集合中对象没清理造成的内存泄漏（特别是 static 修饰的集合）
+  5、接收器、监听器注册没取消造成的内存泄漏（例如广播）
+  6、Activity 的 Context 造成的泄漏（包含大量的引用，比如View Hierarchies和其他资源。），可以使用 ApplicationContext
+  7、静态变量：静态变量的生命周期和应用的生命周期一样长。如果静态变量持有某个Activity的context，则会引发对应Activity无法释放，
+    导致内存泄漏。如果持有application的context，就没有问题（以下例子是指Activity销毁时没有释放的情况）
+    单例模式：内部实现是静态变量和方法
+    静态的View：view默认持有Activity的context
+    静态Activity
+  8、监听器：当使用Activity的context注册监听，不再需要监听时没有取消注册。比如传感器的监听等
+  9、内部类
+    匿名内部类：持有外部类引用。匿名内部类和异步任务一起出现时，可能发生内存泄漏。Activity回收时，异步任务没有执行完毕会导致内存泄漏的发生。
+    因为匿名任务类持有Activity引用，当匿名任务类的引用被另一线程持有，导致生命周期不一致的问题，进而导致内存泄漏
+
+    匿名的AsyncTask
+    new AsyncTask<String, String, String>() {
+                @Override
+                protected String doInBackground(String... params) {
+                    // doSomething
+                    return null;
+                }
+            };
+
+    匿名的TimerTask
+    new Timer().schedule(new TimerTask() {
+                @Override
+                public void run() {
+
+                     // doSomething
+                }
+            }, 1000);
+
+    匿名的Thread或Runnable
+    new Thread() { 
+         @Override public void run() { 
+             while(true);
+             }
+     }.start();
+
+  10、非静态内部类：持有外部类引用
+
+    Handler：我们知道Handler处理消息是串行的，所以当Activity已经需要回收，但Looper仍有消息未处理完毕时会发生内存泄漏。因为Looper使用ThreadLocal保存，ThreadLocal是静态的，生命周期与当前应用一致。同时Looper持有MessageQueue的引用，MessageQueue持有Handler引用（msg.target），Handler持有外部Activity引用，导致Activity无法回收
+    非静态内部类有一个静态的实例：非静态内部类持有外部类引用，如果在某个地方有个非静态内部类的静态实例的话，同样会引起内存泄漏
+
+    资源对象未关闭：BraodcastReceiver，ContentObserver，File，Cursor，Stream，Bitmap等资源，使用后未关闭会导致内存泄漏。因为资源性对象往往都用了一些缓冲，缓冲不仅存在于 java虚拟机内，还存在于java虚拟机外。如果仅仅是把它的引用置null，而不关闭它们，也会造成内存泄漏
+    容器中的对象没有清理：集合一般占用内存较大，不及时关闭会导致内存紧张（不会导致内存泄漏，而会导致可用内存大大减少）
+  11、webview
+
+解决办法：
+
+  内存泄漏：WeakReference弱引用，与强引用（即我们常说的引用）相对，它的特点是，GC在回收时会忽略掉弱引用，即就算有弱引用指向某对象，
+  但只要该对象没有被强引用指向（实际上多数时候还要求没有软引用，但此处软引用的概念可以忽略），该对象就会在被GC检查到时回收掉。对于上面的代码，
+  用户在关闭Activity之后，就算后台线程还没结束，但由于仅有一条来自Handler的弱引用指向Activity，所以GC仍然会在检查的时候把Activity回收掉。
+  这样，内存泄露的问题就不会出现了。
+  
+  1、Java对引用的分类有 Strong reference, SoftReference, WeakReference, PhatomReference 四种。
+    强引用(StrongReference)：JVM 宁可抛出 OOM ，也不会让 GC 回收具有强引用的对象
+    软引用(SoftReference)：只有在内存空间不足时，才会被回的对象
+    弱引用(WeakReference)：在 GC 时，一旦发现了只具有弱引用的对象，不管当前内存空间足够与否，都会回收它的内存
+    虚引用(PhantomReference)：任何时候都可以被GC回收，当垃圾回收器准备回收一个对象时，如果发现它还有虚引用，就会在回收对象的内存之前，
+    把这个虚引用加入到与之关联的引用队列中。程序可以通过判断引用队列中是否存在该对象的虚引用，来了解这个对象是否将要被回收。
+    可以用来作为GC回收Object的标志
+  2、优化数据结构
+    减少占内存较大的枚举的使用
+    采用三级缓存机制：LRUCache
+    图片压缩：inSampleSize、RGB_565替换RGB_8888
+  3、防止内存溢出的方法
+    及时清理容器，将集合里的东西clear，然后置为null
+    使用adapter时，使用ViewHolder来复用convertView
+    
+1、非自定义Handler
+
+    /**
+    *在非自定义 Handler 情况下，还可以通过 Activity 生命周期来及时清除消息，从而及时回收 Activity
+    */
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (mHandler != null){
+            mHandler.removeCallbacksAndMessages(null);
+            mHandler = null;
+        }
+    }
+    
+2、自定义Handler
+
+   /**
+   *在自定义Handler情况下，使用静态内部类构造Handler 并且使用WeakReference持有Activity对象
+   */
+   static class MyHandler extends Handler{
+        WeakReference<Activity> mWeakReference;
+        public MyHandler(Activity activity) {
+            mWeakReference=new WeakReference<Activity>(activity);
+        }
+        @Override
+        public void handleMessage(Message msg){
+            final Activity activity=mWeakReference.get();
+            if(activity!=null){
+                if (msg.what == 1){
+                    noteBookAdapter.notifyDataSetChanged();
+                }
+            }
+        }
+    }
