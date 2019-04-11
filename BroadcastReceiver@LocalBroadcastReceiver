@@ -1,0 +1,70 @@
+BroadcastReceiver是针对应用间、应用与系统间、应用内部进行通信的一种方式
+LocalBroadcastReceiver仅在自己的应用内发送接收广播，也就是只有自己的应用能收到，数据更加安全广播只在这个程序里，而且效率更高。
+
+BroadcastReceiver 使用
+  1.制作intent（可以携带参数）
+  2.使用sendBroadcast()传入intent;
+  3.制作广播接收器类继承BroadcastReceiver重写onReceive方法（或者可以匿名内部类啥的）
+  4.在java中（动态注册）或者直接在Manifest中注册广播接收器（静态注册）使用registerReceiver()传入接收器和intentFilter
+  5.取消注册可以在OnDestroy()函数中，unregisterReceiver()传入接收器
+  
+注册方式----分为以下两种
+  /**
+  *静态注册
+  *常驻型广播：通过在配置文件里面注册广播属于常驻型广播，意思就是即便你应用程序结束，一旦有了对应的广播过来，其还是会被激活；
+  */
+  1、在AndroidManifest.xml文件中注册
+    好处：一旦应用程序被安装到手机里，BroadCast Receiver就开始生效。无论应用程序进程是否运行，运用程序是否在开启状态下都可以接受到广播事件。 
+  2、直接在Manifest.xml文件的<application>节点中配置广播接收者。
+    <receiver android:name=".MyBroadCastReceiver">   
+        <!-- android:priority属性是设置此接收者的优先级（从-1000到1000） -->
+        <intent-filter android:priority="20"> 
+            <actionandroid:name="android.provider.Telephony.SMS_RECEIVED"/>         
+        </intent-filter>  
+    </receiver>
+    
+  /**
+  *动态注册
+  *非常驻型广播：而在代码里注册的广播则是非常驻型广播，比如在oncreate方法里面注册一个广播，
+  *那么在ondestroy里就可以BroadcastReceiver.abortBroadcast()，比如注册一个监听SD卡的广播。
+  */  
+  1、通过代码的方式注册广播
+  好处：一旦运行程序停止，广播也跟着停止。
+     实例化自定义的广播接收者、
+     实例化意图过滤器，并设置要过滤的广播类型（如，我们接收收到短信系统发出的广播）
+     使用Context的registerReceiver(BroadcastReceiver, IntentFilter, String, Handler)方法注册广播。
+     new出上边定义好的BroadcastReceiver 
+
+    1、MyBroadCastReceivery BroadCastReceiver = new MyBroadCastReceiver();
+    //实例化过滤器并设置要过滤的广播  
+    2、IntentFilter intentFilter = new IntentFilter("android.provider.Telephony.SMS_RECEIVED");
+    //注册广播   
+    3、myContext.registerReceiver(smsBroadCastReceiver,intentFilter, "android.permission.RECEIVE_SMS", null);
+    //注销广播
+    4、public void onDesotry(){
+        super.onDestory();
+        myContext.unRegisterReceiver();
+      }
+    
+    发送广播---有序和无序广播 
+    无序广播：所有的接收者都会接收事件，不可以被拦截，不可以被修改。
+    有序广播：按照优先级，一级一级的向下传递，接收者可以修改广播数据，也可以终止广播事件。
+    具体的就不罗列了，置于你说Android 引入广播的意图，我觉得你应该说他为什么要用广播这个组件----android的四大组件之一。
+    应用范围很广泛，举个例子：短信的接收和屏蔽机制---360短信拦截（流氓软件，你干不过他），电池电量改变可以使用广播来监控、
+    应用的开机自启也会用到广播和service结合使用等！它虽然不可见，但是很有用！
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+LocalBroadcastReceiver 使用
+  1.LocalBroadcastReceiver不能静态注册，只能采用动态注册的方式,相比起系统全局广播更加高效。
+  2.在发送和注册的时候采用，LocalBroadcastManager的sendBroadcast方法和registerReceiver方法
+  核心用法
+　　使用LocalBroadcastManager来管理广播：
+  
+    1、调用LocalBroadcastManager.getInstance(this)来获得实例
+    2、调用xx.registerReceiver(BroadcastReceiver receiver,IntentFilter filter)来注册广播;(receiver本地广播接收器)
+    3、调用xx.sendBroadcast()发送广播
+    4、调用xx.unregisterReceiver()取消注册注意事项
+    
+  注意事项
+  在广播中启动activity的话，需要为intent加入FLAG_ACTIVITY_NEW_TASK的标记，不然会报错，因为需要一个栈来存放新打开的activity。
+  广播中弹出AlertDialog的话，需要设置对话框的类型为:TYPE_SYSTEM_ALERT不然是无法弹出的。
