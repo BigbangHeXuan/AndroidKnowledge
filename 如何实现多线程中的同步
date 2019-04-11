@@ -1,0 +1,127 @@
+1.. volatile-某种简单的逻辑下, 是可以的;
+2.. synchronized;
+3.. reentrantLock;
+4.. cas=compare and swap(set), 就是 unsafe 类;
+5.. handler(有点勉强, 他的实现本身依赖上面的一些技术)
+
+
+1、线程间的同步问题一般借助于同步锁 Synchronized 和 volatile 关键字实现:
+
+  /**
+  *一般与单例持有中常见使用
+  */
+  public class Singleton{
+      private volatile static Singleton mSingleton;
+      private static Activity mContext;
+
+      private Singleton(){
+      }
+      public static Singleton getInstance(Activity context){
+        mContext = context;
+        if(mSingleton == null){\\A
+          synchronized(Singleton.class){\\C
+           if(mSingleton == null)
+             mSingleton = new Singleton();\\B
+        }
+      }
+      return mSingleton;
+    }
+  }
+  
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++volatile关键字解析+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  https://www.cnblogs.com/dolphin0520/p/3920373.html
+  
+  
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++synchronized锁解析++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  http://www.itzhai.com/java-based-notebook-thread-synchronization-problem-solving-synchronization-problems-synchronized-block-synchronized-methods.html#read-more
+  
+  1、在多线程中，可能有多个线程试图访问一个有限的资源，必须预防这种情况的发生。
+  所以引入了同步机制：在线程使用一个资源时为其加锁，这样其他的线程便不能访问那个资源了，直到解锁后才可以访问。
+  2、同步机制的实现：
+  2.1、使用synchronized关键字创建synchronized方法：
+  使用synchronized关键字，该关键字修饰的方法叫做同步方法。
+  Java中每个对象都有一个锁或者称为监视器，当访问某个对象的synchronized方法时，表示将该对象上锁，而不仅仅是为该方法上锁。
+  这样如果一个对象的synchronized方法被某个线程执行时，其他线程无法访问该对象的任何synchronized方法（但是可以调用其他非synchronized的方法）。直至该synchronized方法执行完。
+  静态的synchronized方法调用情况：
+  当调用一个对象的静态synchronized方法时，它锁定的并不是synchronized方法所在的对象，而是synchronized方法所在对象对应的Class对象。这样，其他线程就不能调用该类的其他静态synchronized方法了，但是可以调用非静态的synchronized方法。
+  结论：执行静态synchronized方法锁方法所在对象，执行非静态synchronized方法锁方法所在对象对应的Class对象。
+  下面是多线程调用静态的方法的例子，由于锁定了方法所在对象对应的Class对象，其他线程无法调用该方法所在对象其他的静态synchronized方法：
+  /*
+  * 定义一个类，包含了线程类需要调用的方法
+  */
+  class Compute1{
+  //这时如果某个线程调用该方法，
+  //将锁定synchronized方法所在对象对应的class对象，
+  //而不是锁定synchronized方法所在对象
+  public synchronized static void execute(){
+    for(int i = 0; i<100; i++){
+      try {
+          Thread.sleep(100);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        System.out.println(“compute1:execute1 “ + i++);
+    }
+  }
+  
+  public synchronized static void execute2(){
+    for(int i = 0; i<100; i++){
+      try {
+          Thread.sleep(100);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        System.out.println(“compute1:execute2 “ + i++);
+      }
+    }
+  }
+  main方法中两个线程分别调用同一个对象的两个static synchronized方法：
+  public static void main(String[] args) {
+    Compute1 com = new Compute1();
+    Thread thread1 = new Thread1(com);
+    Thread thread2 = new Thread2(com);
+    thread1.start();
+    thread2.start();
+  }
+  一次只能调用一个静态方法，直到执行完成。
+  2.2、使用synchronized创建同步代码块：
+  通过使用synchronized同步代码块，锁定一个对象，该对象作为可执行的标志从而达到同步的效果：
+  /*
+  * 定义一个类，包含了线程类需要调用的方法
+  */
+  class Compute1{
+  //通过同步代码块锁定object1对象进行锁定了其他同样的synchronized代码块
+  private Object object1 = new Object();
+  public void execute(){
+    synchronized(object1){
+      for(int i = 0; i<100; i++){
+        try {
+          Thread.sleep(100);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        System.out.println(“compute1:execute1 “ + i++);
+      }
+    }
+  }
+  public synchronized void execute2(){
+      synchronized(object1){
+          for(int i = 0; i<100; i++){
+              try {
+                  Thread.sleep(100);
+              } catch (InterruptedException e) {
+                  e.printStackTrace();
+              }
+              System.out.println("compute1:execute2 " \+ i++);
+          }
+      }
+  }
+  }
+  如果想要使用synchronized同步代码块达到和使用synchronized方法同样的效果，可以锁定this引用：
+  synchronized(this){
+  …
+  }
+  2.3、synchronized方法和synchronized同步代码块的区别：
+  synchronized同步代码块只是锁定了该代码块，代码块外面的代码还是可以被访问的。
+  synchronized方法是粗粒度的并发控制，某一个时刻只能有一个线程执行该synchronized方法。
+  synchronized同步代码块是细粒度的并发控制，只会将块中的代码同步，代码块之外的代码可以被其他线程同时访问。
