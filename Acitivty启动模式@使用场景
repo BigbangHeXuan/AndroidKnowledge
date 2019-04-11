@@ -1,0 +1,36 @@
+1、activity的四种启动模式
+
+  android:launchMode="standard"
+  可以存在多个实例，这是默认的启动模式，系统总是会在目标栈中创建新的activity实例。
+  
+  android:launchMode="singleTop"
+  如果这个 activity 实例已经存在目标栈的栈顶，系统会调用这个 activity 中的 onNewIntent() 方法，并传递 intent，而不会创建新的 activity 实例；
+  如果不存在这个 activity 实例或者 activity 实例不在栈顶，则 SingleTop 和 Standard 作用是一样的。
+  
+  android:launchMode="singleTask"
+  不会存在多个实例，如果栈中不存在 activity 实例，系统会在新栈的根部创建一个新的 activity；
+  如果这个 activity 实例已经存在，系统会调用这个 activity 的 onNewIntent() 方法而不会创建新的 activity 实例。
+  
+  android:launchMode="singleInstance"
+  这种启动模式比较特殊，因为它会启用一个新的栈结构，将 Acitvity 放置于这个新的栈结构中，并保证不再有其他 Activity 实例进入，
+  除此之外，SingleInstance 模式和 SingleTask 模式是一样的。
+ 
+2、启动模式的使用场景
+
+  LaunchMode 有四种，分别为 Standard，SingleTop，SingleTask 和 SingleInstance，每种模式的实现原理一楼都做了较详细说明，下面说一下具体使用场景：
+
+  Standard 模式是系统默认的启动模式，一般我们 app 中大部分页面都是由该模式的页面构成的，比较常见的场景是：社交应用中，点击查看用户A信息->
+  查看用户A粉丝->在粉丝中挑选查看用户B信息->查看用户A粉丝... 这种情况下一般我们需要保留用户操作 Activity 栈的页面所有执行顺序。
+
+  SingleTop 模式一般常见于社交应用中的通知栏行为功能，例如：App 用户收到几条好友请求的推送消息，需要用户点击推送通知进入到请求者个人信息页，
+  将信息页设置为 SingleTop 模式就可以增强复用性。
+
+  SingleTask 模式一般用作应用的首页，例如浏览器主页，用户可能从多个应用启动浏览器，但主界面仅仅启动一次，其余情况都会走onNewIntent，
+  并且会清空主界面上面的其他页面。
+
+  SingleInstance 模式常应用于独立栈操作的应用，如闹钟的提醒页面，当你在A应用中看视频时，闹钟响了，你点击闹钟提醒通知后进入提醒详情页面，
+  然后点击返回就再次回到A的视频页面，这样就不会过多干扰到用户先前的操作了。
+  
+  除此之外多个页面的嵌套数据的来回显示：需要着重注意以上几种模式的配合使用
+  例如：A页面需要显示B页面编辑保存后的信息，并且A页面从其他页面携带的数据不能丢失，而且A页面跳转到B页面编辑信息时，不能重复创建。
+  此时A页面适用于singleTask B页面使用与SingleTop C页面则适用于Standard默认模式
