@@ -1,0 +1,187 @@
+1、android 中activity和fragment数据通信
+
+  ++++++++++++++++++++++++++++++++++++++++++++++++++Google推荐方式 Bundle和setArguments(bundle)+++++++++++++++++++++++++++++++++++++++++++
+  
+  /*
+   *初始化Fragment实例并setArguments
+   */
+  DiscoverFragment discoverFragment = new DiscoverFragment();
+  Bundle bundle = new Bundle();
+  bundle.putString("email", email);
+  discoverFragment.setArguments(bundle);
+  
+  
+  /*
+   *在Fragment中拿到Arguments：
+   */
+  public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+      View view = inflater.inflate(R.layout.fragment_discover, null);
+      Bundle bundle = getArguments();
+      //这里就拿到了之前传递的参数
+      email = bundle.getString("email");
+      return view;
+  }
+  
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++onAttach @ 接口回调+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  /*
+   *在 Fragment 中定义一个接口、调用接口中的抽象方法
+   *在 Activity 中实现接口，并具体实现接口中的方法，完成通信。
+   */
+   public class MainFragment extends Fragment{
+   
+      public FragmentListener mListener; 
+       
+      @Override 
+      public void onAttach(Activity activity) { 
+            super.onAttach(activity); 
+            //对传递进来的Activity进行接口转换
+             if(activity instance FragmentListener){
+                 mListener = ((FragmentListener)activity); 
+            }
+      } 
+      
+      //MainFragment开放的接口 
+      public static interface FragmentListener{ 
+         void toH5Page();//跳到h5页面
+         void showMsg(String str);//展示消息
+      }
+      
+      
+       ...其他处理代码省略 
+       mButton.setOnClickListener(new View.OnClickListener() {
+          @Override
+          public void onClick(View view) {
+              msgListener.showMsg("Hello 传递数据给Activity展示");
+          }
+      });
+  }
+  
+  // MainActivity 实现 MainFragment开放的接口 
+  public class MainActivity extends FragmentActivity implements FragmentListener{ 
+        @override
+        public void toH5Page(){... }
+         
+        @Override
+        public void showMsg(String str) {
+            Toast.makeText(MainActivity.this, str, Toast.LENGTH_SHORT).show();
+        } 
+       ...其他处理代码省略
+  }
+  
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++广播++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  /*
+   *在 Activity 中注册广播接收器，在 Fragment中发送广播
+   */
+    private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action.equals(ACTION_NAME)) {
+                String msg = intent.getStringExtra("msg");
+                Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
+            }
+        }
+    };
+    public void registerBoradcastReceiver() {
+        IntentFilter myIntentFilter = new IntentFilter();
+        myIntentFilter.addAction(ACTION_NAME);
+        registerReceiver(mBroadcastReceiver, myIntentFilter);
+    }
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(mBroadcastReceiver);
+    }
+    
+  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++EventBus+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  /*
+   * activity(作为接收方) 
+   */
+   //1、注册订阅者
+   EventBus.getDefault().register(this);
+
+   //2、定义接收信息的方法
+   @Subscribe
+   public void onEventMainThread(UserEvent event) {
+      btn.setText(event.getUserName());
+      service_tv.setText(event.getUserName());
+   }
+   //3、定义实体类 UserEvent（可抽象定义接口实现方法）
+   public class LogoutEvent {//示例
+        /**
+         *
+         * 退出登录后通知
+         * 格式：
+         * 单独通知  logout_target_event
+         *          logout_main_personal_refresh_nickname  退出登录，MainActivity_PersonalFragment刷新头像右侧用户昵称
+         * 全局通知  logout_notify_all//全局通知可能会有问题（同时产生多个网络请求，对象回收后空指针等）
+         */
+        private String msg;
+
+        public LogoutEvent(String msg) {
+            this.msg = msg;
+        }
+
+        public String getMsg() {
+            return msg;
+        }
+
+        public void setMsg(String msg) {
+            this.msg = msg;
+        }
+    }
+   /*
+    *Fragment作为发送方（同样需要注册EventBus）
+    */
+    UserEvent event=new UserEvent();
+    EventBus.getDefault().post(event);
+    
+    +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++Handler+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    /**
+     *Fragment对具体的Activity存在耦合，不利于Fragment复用不利于维护，若想删除相应的Activity，Fragment也得改动
+     *没法获取Activity的返回数据,所以一般不建议使用这种方法。
+     */
+      public class MainActivity extends FragmentActivity{ 
+        //声明一个Handler 
+        public Handler mHandler = new Handler(){       
+            @Override
+             public void handleMessage(Message msg) { 
+                  super.handleMessage(msg);
+                   //相应的逻辑处理代码
+             }
+        } 
+      } 
+      public class MainFragment extends Fragment{ 
+            //保存Activity传递的handler
+             private Handler mHandler;
+             @Override
+             public void onAttach(Activity activity) { 
+                  super.onAttach(activity);
+
+                  if(activity instance MainActivity){ 
+                        mHandler =  ((MainActivity)activity).mHandler; 
+                  }
+             }
+      }
+    
+2、android中Fragment && Fragment 数据交互
+  +++++++++++++++++++++++++++++++++++++++++++++++++Fragment.setTargetFragment、getTargetFragment()+++++++++++++++++++++++++++++++++++++
+  /**
+  *在 FirstFragment 中，通过setTargetFragment来连接需要交互的Fragment：
+  */
+  secondFragment.setTargetFragment(FirstFragment.this, REQUEST_CODE);
+  
+  /**
+  *在 SecondFragment 中调用sendResult（）方法，回传数据给 FirstFragment:
+  */
+  private void sendResult(int resultOk) {  
+        if(getTargetFragment() == null){  
+            return;  
+        }else{  
+            Intent intent = new Intent();  
+            intent.putExtra("key", 520); 
+            getTargetFragment().onActivityResult(FirstFragment.REQUEST_CODE,resultOk,intent);  
+        }  
+   }
+
+  
